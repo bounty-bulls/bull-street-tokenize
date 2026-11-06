@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { isAddress, keccak256, toHex, type Address } from "viem";
+import { isAddress, keccak256, toHex, verifyMessage, type Address, type Hex } from "viem";
 import { brokerRegistryAbi, pledgeRegistryAbi, assetById } from "@bullstreet/shared";
 import { now } from "@bullstreet/shared/db";
 import {
@@ -7,8 +7,11 @@ import {
   accountsByWallet,
   agreementFor,
   createAccount,
+  accept,
   getAccount,
   getPledge,
+  invoke,
+  release,
   guidedInstructions,
   inboxOf,
   pledgeByAgreement,
@@ -178,5 +181,54 @@ dep.post(
     if (!ALLOW_DEV_IDENTITY) return c.json({ error: "Not available" }, 404);
     const body = await c.req.json();
     return c.json(createAccount(db, body));
+  }),
+);
+
+/** The message a pledgee signs to act on its own depository account (prevents anyone acting for it). */
+export const depMessage = (action: string, psn: string, qty: number, ts: number) =>
+  `Bull Street depository\naction: ${action}\npsn: ${psn}\nqty: ${qty}\ntime: ${ts}`;
+
+async function pledgeeAuth(c: any, action: string) {
+  const psn = c.req.param("psn");
+  const { wallet, qty = 0, ts, sig } = (await c.req.json()) as { wallet: Address; qty?: number; ts: number; sig?: Hex };
+  const p = getPledge(db, psn);
+  if (!p) return { error: c.json({ error: "Unknown PSN" }, 404) };
+  const owner = getAccount(db, p.pledgee)?.account.owner_wallet;
+  if (!owner || owner !== String(wallet).toLowerCase()) return { error: c.json({ error: "Only the pledgee can do this" }, 403) };
+  if (!ALLOW_DEV_IDENTITY) {
+    if (!sig || Math.abs(Date.now() / 1000 - ts) > 300) return { error: c.json({ error: "Signature required" }, 401) };
+    const ok = await verifyMessage({ address: wallet, message: depMessage(action, psn, qty, ts), signature: sig });
+    if (!ok) return { error: c.json({ error: "Bad signature" }, 401) };
+  }
+  return { psn, qty: Number(qty) };
+}
+
+/** Pledgee confirms a pledge it can see in its CDSL account (guided pledges, or manual acceptance). */
+dep.post(
+  "/pledges/:psn/confirm",
+  guard(async (c) => {
+    const r = await pledgeeAuth(c, "confirm");
+    if ("error" in r) return r.error;
+    return c.json(accept(db, r.psn));
+  }),
+);
+
+/** Pledgee invokes shares to sell them for a redemption. */
+dep.post(
+  "/pledges/:psn/invoke",
+  guard(async (c) => {
+    const r = await pledgeeAuth(c, "invoke");
+    if ("error" in r) return r.error;
+    return c.json(invoke(db, r.psn, r.qty));
+  }),
+);
+
+/** Pledgee unpledges shares the minter asked to release. */
+dep.post(
+  "/pledges/:psn/release",
+  guard(async (c) => {
+    const r = await pledgeeAuth(c, "release");
+    if ("error" in r) return r.error;
+    return c.json(release(db, r.psn, r.qty));
   }),
 );
