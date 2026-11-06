@@ -87,8 +87,6 @@ async function runBroker(broker: Address, agent: ReturnType<typeof brokerAgents>
 
   // 2. settle allocations on this broker's pledges
   await settleAllocations(broker, agent, name);
-
-  await send(agent, d.brokers, brokerRegistryAbi, "poke", [broker]).catch(() => {});
 }
 
 async function attest(

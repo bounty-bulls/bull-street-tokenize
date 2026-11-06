@@ -95,7 +95,12 @@ export async function keeperTick(): Promise<void> {
   const brokers = await read<Address[]>(d.brokers, brokerRegistryAbi, "brokers");
   for (const b of brokers) {
     const s = Number(await read<number>(d.brokers, brokerRegistryAbi, "statusOf", [b]));
-    if (s === BrokerStatus.Active || s === BrokerStatus.Pending) await tryTx(`poked ${b.slice(0, 8)}`, d.brokers, brokerRegistryAbi, "poke", [b]);
+    if (s === BrokerStatus.Active || s === BrokerStatus.Pending) {
+      // poke only when it changes something: health below 1.0, or a cure clock running
+      const info = await read<any>(d.brokers, brokerRegistryAbi, "brokerOf", [b]);
+      const health = await read<bigint>(d.brokers, brokerRegistryAbi, "health", [b]);
+      if (health < 10_000n || Number(info.healthLowSince) > 0) await tryTx(`poked ${b.slice(0, 8)}`, d.brokers, brokerRegistryAbi, "poke", [b]);
+    }
     if (s === BrokerStatus.Draining || s === BrokerStatus.Defaulted) {
       const key = `requeued:${b}:${s}`;
       const done = db.prepare("SELECT value FROM kv WHERE key = ?").get(key);
