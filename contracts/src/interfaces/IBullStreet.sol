@@ -92,6 +92,7 @@ interface IPledgeRegistry {
     function pledgeOf(uint256 id) external view returns (Pledge memory);
     function levelInfo(uint256 id) external view returns (bool member, uint32 assetId, uint256 f, Level level);
     function freeOf(uint256 id) external view returns (uint256);
+    function routeInfo(uint256 id) external view returns (address broker, address minter, uint256 f, uint32 assetId);
     function lastInvokedAt(address minter) external view returns (uint64);
     function onAllocate(uint256 id, uint256 units) external;
     function onDeallocate(uint256 id, uint256 units) external;
