@@ -13,12 +13,24 @@ export function useDeployment() {
   return useQuery({ queryKey: ["deployment"], queryFn: () => api<Deployment>("/deployment"), staleTime: Infinity, retry: 2 });
 }
 
+let freshUntil = 0;
+/** Ask the next snapshot reads for up-to-date data instead of the API's cached copy. */
+export function wantFreshSnapshot() {
+  freshUntil = Date.now() + 10_000;
+}
+
 /** Whole-protocol snapshot from the API, refreshed every 4 seconds and after every transaction. */
 export function useSnapshot() {
   const { address } = useActiveAccount();
   return useQuery({
     queryKey: ["snapshot", address],
-    queryFn: () => api<Snapshot>(`/snapshot${address ? `?wallet=${address}` : ""}`),
+    queryFn: () => {
+      const q = new URLSearchParams();
+      if (address) q.set("wallet", address);
+      if (Date.now() < freshUntil) q.set("fresh", "1"); // right after a transaction: skip the API's cache
+      const qs = q.toString();
+      return api<Snapshot>(`/snapshot${qs ? `?${qs}` : ""}`);
+    },
     refetchInterval: 4000,
     placeholderData: (prev) => prev,
   });
@@ -107,6 +119,7 @@ export function useTx() {
             if (receipt.status !== "success") throw new Error("Transaction reverted");
           }
         }
+        wantFreshSnapshot();
         await qc.invalidateQueries({ queryKey: ["snapshot"] });
         return true;
       } catch (e) {

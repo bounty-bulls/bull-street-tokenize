@@ -350,7 +350,38 @@ async function readDuties(wallet: Address) {
   return readAllocations(ids.slice(0, 100));
 }
 
+// A snapshot takes about a dozen RPC round trips (seconds on a public testnet RPC). Polls get the latest
+// cached copy at once and refresh it in the background; `?fresh=1` (sent right after a transaction) waits
+// for a new one. Concurrent builds for the same wallet are shared.
+type Entry = { at: number; data?: Awaited<ReturnType<typeof buildSnapshot>>; building?: Promise<Awaited<ReturnType<typeof buildSnapshot>>> };
+const cache = new Map<string, Entry>();
+const REFRESH_MS = 2_000;
+const MAX_AGE_MS = 20_000;
+
+function refresh(key: string, wallet?: Address) {
+  const e = cache.get(key) ?? { at: 0 };
+  if (!e.building) {
+    e.building = buildSnapshot(wallet)
+      .then((data) => {
+        e.data = data;
+        e.at = Date.now();
+        return data;
+      })
+      .finally(() => {
+        e.building = undefined;
+      });
+    cache.set(key, e);
+  }
+  return e.building;
+}
+
 snapshot.get("/", async (c) => {
   const w = c.req.query("wallet");
-  return c.json(await buildSnapshot(w && isAddress(w) ? (w as Address) : undefined));
+  const wallet = w && isAddress(w) ? (w as Address) : undefined;
+  const key = wallet?.toLowerCase() ?? "-";
+  const e = cache.get(key);
+  const age = e?.data ? Date.now() - e.at : Infinity;
+  if (c.req.query("fresh") || age > MAX_AGE_MS) return c.json(await refresh(key, wallet));
+  if (age > REFRESH_MS) refresh(key, wallet).catch(() => {});
+  return c.json(e!.data);
 });
