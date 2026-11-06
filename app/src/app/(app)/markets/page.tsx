@@ -22,7 +22,7 @@ import {
   usd,
 } from "@/components/ui";
 import { api } from "@/lib/api";
-import { ago, useNow, useSnapshot } from "@/lib/hooks";
+import { ago, short, useNow, useSnapshot } from "@/lib/hooks";
 import { marketPrice, pledgedUnits, premiumPct, sumBig } from "@/lib/market";
 import type { Snapshot } from "@/lib/types";
 
@@ -124,7 +124,7 @@ function BrokersTable({ s }: { s: Snapshot }) {
               <tr key={b.address}>
                 <td>
                   <div className="font-medium text-ink">{b.name}</div>
-                  <Addr a={b.address} label={undefined} />
+                  <Addr a={b.address} label={short(b.address)} />
                 </td>
                 <td>{TIER_LABEL[b.tier]}</td>
                 <td>
@@ -289,11 +289,11 @@ export default function MarketsPage() {
         <>
           <RuleBanner s={s} />
           <MarketsTable s={s} />
-          <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
-            <BrokersTable s={s} />
+          <BrokersTable s={s} />
+          <div className="grid gap-6 lg:grid-cols-[1.3fr_1fr]">
+            <QueueLevels s={s} />
             <Activity />
           </div>
-          <QueueLevels s={s} />
         </>
       )}
     </div>
