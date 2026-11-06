@@ -26,8 +26,14 @@ import { db, deployment, jsonSafe, publicClient } from "../ctx";
 export const snapshot = new Hono();
 
 type Call = { address: Address; abi: any; functionName: string; args?: readonly unknown[] };
-const mc = async <T = any>(calls: Call[]): Promise<T[]> =>
-  calls.length ? ((await publicClient.multicall({ contracts: calls as any, allowFailure: false })) as T[]) : [];
+/** Batched reads in chunks small enough for public RPC limits (Arc caps request size and call gas). */
+const mc = async <T = any>(calls: Call[], chunk = 20): Promise<T[]> => {
+  const parts: Promise<T[]>[] = [];
+  for (let i = 0; i < calls.length; i += chunk) {
+    parts.push(publicClient.multicall({ contracts: calls.slice(i, i + chunk) as any, allowFailure: false }) as Promise<T[]>);
+  }
+  return (await Promise.all(parts)).flat();
+};
 
 export async function buildSnapshot(wallet?: Address) {
   const d = deployment();
@@ -69,8 +75,8 @@ export async function buildSnapshot(wallet?: Address) {
       { address: d.priceOracle, abi: priceOracleAbi, functionName: "hasPrice", args: [id] },
       { address: d.priceOracle, abi: priceOracleAbi, functionName: "isStale", args: [id] },
       { address: d.exchange, abi: exchangeAbi, functionName: "lastTradePrice", args: [id] },
-      { address: d.exchange, abi: exchangeAbi, functionName: "openOrders", args: [id, Side.Buy, 0n, 300n] },
-      { address: d.exchange, abi: exchangeAbi, functionName: "openOrders", args: [id, Side.Sell, 0n, 300n] },
+      { address: d.exchange, abi: exchangeAbi, functionName: "openOrders", args: [id, Side.Buy, 0n, 100n] },
+      { address: d.exchange, abi: exchangeAbi, functionName: "openOrders", args: [id, Side.Sell, 0n, 100n] },
       { address: d.levelBook, abi: levelBookAbi, functionName: "free", args: [id, 1] },
       { address: d.levelBook, abi: levelBookAbi, functionName: "free", args: [id, 2] },
       { address: d.levelBook, abi: levelBookAbi, functionName: "free", args: [id, 3] },
