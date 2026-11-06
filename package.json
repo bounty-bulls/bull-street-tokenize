@@ -10,7 +10,7 @@
     "test": "pnpm -r test",
     "lint": "pnpm -r lint",
     "e2e": "tsx scripts/e2e.ts",
-    "chain": "anvil --port 8545 --block-time 1",
+    "chain": "anvil --port 8545",
     "deploy:local": "tsx scripts/deploy.ts local",
     "deploy:arc": "tsx scripts/deploy.ts arc",
     "seed": "tsx scripts/seed.ts",

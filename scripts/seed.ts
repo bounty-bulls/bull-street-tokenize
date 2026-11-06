@@ -30,7 +30,7 @@ import {
 import { env, keyAccount, persona } from "../services/shared/src/node";
 import { createAccount, setupPledge, agreementFor, pledgeByAgreement } from "../services/shared/src/depository";
 import { now } from "../services/shared/src/db";
-import { CHAIN_ID, d, db, publicClient, read, send, wallet } from "../services/workers/src/ctx";
+import { CHAIN_ID, d, db, nowSec, publicClient, read, send, syncClock, wallet } from "../services/workers/src/ctx";
 import { postPrices, postSessions } from "../services/workers/src/oracle";
 import { brokerTick } from "../services/workers/src/brokerAgent";
 
@@ -75,7 +75,7 @@ async function approve(who: PersonaKey, token: Address, spender: Address) {
 async function register(who: PersonaKey, role: number) {
   const acc = P(who);
   if (Number(await read(d.roles, roleRegistryAbi, "roleOf", [acc.address])) !== 0) return;
-  const attestation = { wallet: acc.address, role, nullifierHash: keccak256(toHex(`seed:${who}`)), expiry: BigInt(now() + 900), nonce: randomNonce() };
+  const attestation = { wallet: acc.address, role, nullifierHash: keccak256(toHex(`seed:${who}`)), expiry: BigInt(nowSec() + 900), nonce: randomNonce() };
   const sig = await world.signTypedData({ domain: domain(CHAIN_ID, d.roles), types: roleAttestationTypes, primaryType: "RoleAttestation", message: attestation });
   await send(acc, d.roles, roleRegistryAbi, "register", [attestation, sig]);
   console.log(`  ${who} registered as ${role === Role.Minter ? "minter" : "broker"}`);
@@ -83,6 +83,7 @@ async function register(who: PersonaKey, role: number) {
 
 async function main() {
   console.log(`Seeding chain ${CHAIN_ID}`);
+  await syncClock(); // chain time (a local chain may have been moved forward)
   if (LOCAL) {
     // let the app's local account switcher send transactions as the seeded personas
     for (const k of ["alice", "carol", "dev", "brokerX", "brokerY", "brokerZ", "bob", "eve", "fay"] as PersonaKey[]) {
