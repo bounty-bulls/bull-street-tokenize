@@ -16,7 +16,8 @@ export function loadEnv(file = join(repoRoot, ".env")): void {
   for (const line of readFileSync(file, "utf8").split("\n")) {
     const m = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$/);
     if (!m || line.trim().startsWith("#")) continue;
-    const v = m[2].replace(/^"(.*)"$/, "$1");
+    const raw = m[2].trim();
+    const v = raw.startsWith('"') ? raw.replace(/^"(.*)"$/, "$1") : raw.replace(/\s+#.*$/, "");
     if (process.env[m[1]] === undefined) process.env[m[1]] = v;
   }
 }

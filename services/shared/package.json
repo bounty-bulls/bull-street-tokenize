@@ -20,7 +20,7 @@
   "dependencies": {
     "viem": "2.57.13",
     "zod": "4.6.7",
-    "better-sqlite3": "13.0.3"
+    "better-sqlite3": "12.11.1"
   },
   "devDependencies": {
     "@types/node": "26.6.6",
