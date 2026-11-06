@@ -21,7 +21,7 @@ contracts/broadcast/*/*/dry-run/
 data/
 *.sqlite
 *.sqlite-journal
-deploy/local/
+deploy/31337/
 
 # misc
 *.log
