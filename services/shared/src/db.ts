@@ -48,7 +48,8 @@ CREATE INDEX IF NOT EXISTS events_name ON events(name, block);
 
 let cached: DB | undefined;
 
-export function openDb(path = process.env.DB_PATH ?? "data/bullstreet.sqlite"): DB {
+/** One database per chain, so a local run never leaks depository records or events into a testnet run */
+export function openDb(path = process.env.DB_PATH || `data/bullstreet-${process.env.CHAIN_ID ?? "31337"}.sqlite`): DB {
   if (cached) return cached;
   const file = isAbsolute(path) ? path : join(repoRoot, path);
   mkdirSync(dirname(file), { recursive: true });
