@@ -8,7 +8,9 @@
   "exports": {
     ".": "./src/index.ts",
     "./calendar": "./src/calendar.ts",
-    "./node": "./src/node.ts"
+    "./node": "./src/node.ts",
+    "./db": "./src/db.ts",
+    "./depository": "./src/depository.ts"
   },
   "scripts": {
     "gen": "tsx scripts/gen-abis.ts",
@@ -17,12 +19,14 @@
   },
   "dependencies": {
     "viem": "2.57.13",
-    "zod": "4.6.7"
+    "zod": "4.6.7",
+    "better-sqlite3": "13.0.3"
   },
   "devDependencies": {
     "@types/node": "26.6.6",
     "tsx": "4.23.15",
     "typescript": "5.9.3",
-    "vitest": "5.0.5"
+    "vitest": "5.0.5",
+    "@types/better-sqlite3": "7.6.13"
   }
 }
