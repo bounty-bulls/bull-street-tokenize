@@ -39,6 +39,7 @@ contract AssetFactory is Ownable2Step {
         token = address(
             new StockToken(dir, assetId, string.concat("Bull Street ", name), string.concat("b", ticker))
         );
+        StockToken(token).refreshWiring();
         _assets[assetId] = Asset(token, isin, ticker, name);
         assetOfToken[token] = assetId;
         assetOfIsin[h] = assetId;

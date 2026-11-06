@@ -4,6 +4,7 @@ pragma solidity ^0.8.28;
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {Directory} from "../common/Directory.sol";
+import {Wired} from "../common/Wired.sol";
 import {ICompliance} from "../interfaces/IBullStreet.sol";
 import {BadParam, NotFrozen, NotWired} from "../common/Errors.sol";
 
@@ -12,8 +13,7 @@ import {BadParam, NotFrozen, NotWired} from "../common/Errors.sol";
 ///         pledge registry and the redemption engine can mint or burn. Every transfer passes compliance.
 ///         Corporate actions (splits, bonuses) change the shares-per-token multiplier instead of balances, so the
 ///         token never rebases: after a 1:1 bonus, one token stands for two shares.
-contract StockToken is ERC20 {
-    Directory public immutable dir;
+contract StockToken is Wired, ERC20 {
     address public immutable factory;
     uint32 public immutable assetId;
 
@@ -23,14 +23,13 @@ contract StockToken is ERC20 {
 
     event CorporateActionApplied(uint128 num, uint128 den, uint128 newNum, uint128 newDen);
 
-    constructor(Directory dir_, uint32 assetId_, string memory name_, string memory symbol_) ERC20(name_, symbol_) {
-        dir = dir_;
+    constructor(Directory dir_, uint32 assetId_, string memory name_, string memory symbol_) ERC20(name_, symbol_) Wired(dir_) {
         factory = msg.sender;
         assetId = assetId_;
     }
 
     modifier onlyProtocol() {
-        if (msg.sender != dir.pledges() && msg.sender != dir.redemption()) revert NotWired();
+        if (msg.sender != _w.pledges && msg.sender != _w.redemption) revert NotWired();
         _;
     }
 
@@ -46,7 +45,7 @@ contract StockToken is ERC20 {
     function applyCorporateAction(uint128 num, uint128 den) external {
         if (msg.sender != factory) revert NotWired();
         if (num == 0 || den == 0) revert BadParam();
-        if (!ICompliance(dir.compliance()).frozen(assetId)) revert NotFrozen();
+        if (!ICompliance(_w.compliance).frozen(assetId)) revert NotFrozen();
         uint256 n = uint256(mulNum) * num;
         uint256 d = uint256(mulDen) * den;
         uint256 g = _gcd(n, d);
@@ -83,7 +82,7 @@ contract StockToken is ERC20 {
     }
 
     function _update(address from, address to, uint256 value) internal override {
-        ICompliance(dir.compliance()).check(from, to, assetId);
+        ICompliance(_w.compliance).check(from, to, assetId);
         super._update(from, to, value);
     }
 

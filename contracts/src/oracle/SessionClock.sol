@@ -5,6 +5,7 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Attestations, TypeHashes} from "../common/Attestations.sol";
 import {SignerSet} from "../common/SignerSet.sol";
 import {Directory} from "../common/Directory.sol";
+import {Wired} from "../common/Wired.sol";
 import {K} from "../common/Params.sol";
 import {IParams} from "../interfaces/IBullStreet.sol";
 import {BadSessions, SessionsNotPosted} from "../common/Errors.sol";
@@ -14,7 +15,7 @@ import {Deadlines} from "../common/Types.sol";
 /// @notice The NSE trading calendar on-chain. Sessions are posted ahead of time in contiguous batches signed by
 ///         the oracle signer set. The same contract runs the real NSE calendar or a compressed one; only the
 ///         posted sessions and the time parameters differ.
-contract SessionClock is Attestations, SignerSet {
+contract SessionClock is Wired, Attestations, SignerSet {
     struct SessionInfo {
         uint32 sessionIndex;
         uint64 openTime;
@@ -26,13 +27,11 @@ contract SessionClock is Attestations, SignerSet {
         uint64 closeTime;
     }
 
-    Directory public immutable dir;
     Session[] private _sessions;
 
     event SessionsPosted(uint32 fromIndex, uint32 count);
 
-    constructor(Directory dir_, address owner_, address[] memory signers_, uint256 threshold_) Ownable(owner_) {
-        dir = dir_;
+    constructor(Directory dir_, address owner_, address[] memory signers_, uint256 threshold_) Ownable(owner_) Wired(dir_) {
         _setSigners(signers_, threshold_);
     }
 
@@ -122,14 +121,14 @@ contract SessionClock is Attestations, SignerSet {
         if (isOpen()) return false;
         uint256 n = _startedBy(uint64(block.timestamp));
         if (n >= _sessions.length) return true;
-        return _sessions[n].openTime - block.timestamp > IParams(dir.params()).get(K.EXT_CLOSURE);
+        return _sessions[n].openTime - block.timestamp > IParams(_w.params).get(K.EXT_CLOSURE);
     }
 
     /// @notice Redemption deadlines for a request made at `t`.
     ///         refSession = first session opening after t (so a full notice window always exists);
     ///         cure = refSession open + CURE_GRACE (capped at its close); soft/hard = close of refSession + 2 / + 3.
     function deadlines(uint64 t) public view returns (Deadlines memory d) {
-        IParams p = IParams(dir.params());
+        IParams p = IParams(_w.params);
         uint32 c = nextSessionIndexAt(t);
         uint32 softIdx = c + uint32(p.get(K.SOFT_SESSIONS));
         uint32 hardIdx = c + uint32(p.get(K.HARD_SESSIONS));

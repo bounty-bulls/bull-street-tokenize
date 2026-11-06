@@ -5,6 +5,7 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Attestations, TypeHashes} from "../common/Attestations.sol";
 import {SignerSet} from "../common/SignerSet.sol";
 import {Directory} from "../common/Directory.sol";
+import {Wired} from "../common/Wired.sol";
 import {ISessionClock} from "../interfaces/IBullStreet.sol";
 import {BadParam, OldPrice, PriceNotPosted, PriceStale, SessionNotClosed} from "../common/Errors.sol";
 
@@ -12,7 +13,7 @@ import {BadParam, OldPrice, PriceNotPosted, PriceStale, SessionNotClosed} from "
 /// @notice NSE closing prices in USDC per share (6 decimals), one per asset per closed session, signed by the
 ///         oracle signer set (m-of-n). Every past close is kept: redemptions are priced at the close of a specific
 ///         session.
-contract PriceOracle is Attestations, SignerSet {
+contract PriceOracle is Wired, Attestations, SignerSet {
     struct Latest {
         uint256 close;
         uint32 session;
@@ -20,14 +21,12 @@ contract PriceOracle is Attestations, SignerSet {
         bool set;
     }
 
-    Directory public immutable dir;
     mapping(uint32 => Latest) private _latest;
     mapping(uint32 => mapping(uint32 => uint256)) private _closeAt;
 
     event PriceUpdated(uint32 indexed assetId, uint256 close, uint32 indexed sessionIndex, uint64 asOf);
 
-    constructor(Directory dir_, address owner_, address[] memory signers_, uint256 threshold_) Ownable(owner_) {
-        dir = dir_;
+    constructor(Directory dir_, address owner_, address[] memory signers_, uint256 threshold_) Ownable(owner_) Wired(dir_) {
         _setSigners(signers_, threshold_);
     }
 
@@ -52,7 +51,7 @@ contract PriceOracle is Attestations, SignerSet {
         );
         _verifyThreshold(structHash, sigs, isSigner, threshold);
         _useNonce(address(this), nonce);
-        if (!ISessionClock(dir.sessionClock()).isClosed(sessionIndex)) revert SessionNotClosed();
+        if (!ISessionClock(_w.sessionClock).isClosed(sessionIndex)) revert SessionNotClosed();
 
         for (uint256 i; i < assetIds.length; ++i) {
             uint32 a = assetIds[i];
@@ -84,7 +83,7 @@ contract PriceOracle is Attestations, SignerSet {
     function isStale(uint32 assetId) public view returns (bool) {
         Latest memory l = _latest[assetId];
         if (!l.set) return true;
-        (bool found, uint32 last) = ISessionClock(dir.sessionClock()).lastClosedSession();
+        (bool found, uint32 last) = ISessionClock(_w.sessionClock).lastClosedSession();
         return found && l.session < last;
     }
 
