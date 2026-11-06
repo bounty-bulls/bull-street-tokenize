@@ -98,6 +98,155 @@ The token holder is anywhere in the world; the shares are in India. USDC is the 
 | Shared | ABIs, EIP-712 types, calendars, depository ledger, SQLite store | `services/shared` |
 | App | Next.js: landing, Markets, Trade (order book), Mint, Broker, Redeem, Ops, Get started | `app/` |
 
+### System design
+
+Users sign every money-moving transaction from their own wallet straight to the contracts. The off-chain host reads the chain, verifies World ID, plays the CDSL depository and runs the robots that post sessions and prices, attest pledges, settle redemptions and do upkeep. API and workers share one SQLite file, so they run on the same machine.
+
+```mermaid
+flowchart TB
+  %% ---------------- users ----------------
+  subgraph USERS["Users"]
+    direction LR
+    MIN["Minter<br/>shareholder, World ID"]
+    BRK["Broker<br/>CDSL pledgee, World ID"]
+    TRD["Trader / holder<br/>no sign-up"]
+    OPS["Operator<br/>contract owner"]
+  end
+
+  %% ---------------- browser ----------------
+  subgraph BROWSER["Browser: Next.js app (app/)"]
+    direction LR
+    PAGES["Pages<br/>/ · /markets · /trade · /mint<br/>/broker · /redeem · /onboard · /ops"]
+    WAL["Wallet layer (wagmi)<br/>browser wallet · Circle passkey<br/>smart account · local accounts"]
+    IDK["IDKit 4<br/>World ID Proof of Human"]
+  end
+
+  %% ---------------- off-chain host ----------------
+  subgraph HOST["Off-chain host (services/)"]
+    direction TB
+    subgraph API["API: Hono, port 8790"]
+      direction LR
+      R_SNAP["GET /snapshot<br/>chunked chain reads"]
+      R_WORLD["/world/rp-context<br/>/world/verify<br/>/world/dev (local only)"]
+      R_DEP["/dep/*<br/>simulated CDSL:<br/>accounts, pledges, PSN,<br/>signed pledgee actions"]
+      R_PLAN["/plan/pledge<br/>/plan/allocation"]
+      R_FEED["/notices · /activity<br/>/deployment · /health"]
+    end
+    subgraph WORKERS["Workers: one Node process"]
+      direction LR
+      W_ORA["Oracle · 15 s<br/>24 sessions ahead,<br/>closes signed 2 of 3"]
+      W_IDX["Indexer · 4 s<br/>events → SQLite,<br/>in-app notices"]
+      W_BRK["Broker agents · 15 s<br/>attest · invoke+sell ·<br/>settle · release · re-attest"]
+      W_KEEP["Keeper · 30 s<br/>CDSL processing, batches,<br/>cures, claims, defaults,<br/>health, stale, expiries"]
+    end
+    DB[("SQLite (WAL)<br/>dep_accounts · dep_pledges · events<br/>notices · world_roles · kv")]
+    KEYS{{"Hot keys from .env<br/>oracle ×3 · keeper · broker desks<br/>World attestor"}}
+  end
+
+  %% ---------------- external ----------------
+  subgraph EXT["External services"]
+    direction LR
+    WORLD["World Developer Portal<br/>proof verification"]
+    PX["Twelve Data → Yahoo fallback<br/>NSE closes"]
+    FX["Frankfurter · open.er-api · Yahoo<br/>USD/INR median"]
+  end
+
+  %% ---------------- chain ----------------
+  subgraph ARC["Arc testnet 5042002 · USDC 0x3600…0000 is money and gas"]
+    direction TB
+    DIR["Directory<br/>address book, cached by each contract"]
+    subgraph CORE["Identity, time and rules"]
+      direction LR
+      RR["RoleRegistry<br/>one nullifier, one role"]
+      SC["SessionClock<br/>sessions + deadlines"]
+      PO["PriceOracle<br/>one close per session"]
+      CO["Compliance<br/>pauses · freeze · denylist"]
+      PAR["Params<br/>fees · caps · timings"]
+    end
+    subgraph LEDGER["Pledges and brokers"]
+      direction LR
+      PR["PledgeRegistry<br/>q ≥ m ≥ a per pledge<br/>open · attest · mint · burn<br/>reattest · release · migrate"]
+      BR["BrokerRegistry<br/>tiers · exposure · health"]
+      BV["BondVault<br/>USDC bonds"]
+      LB["LevelBook<br/>queue levels L1-L4"]
+    end
+    subgraph MONEY["Redemption and trading"]
+      direction LR
+      RE["RedemptionEngine<br/>tickets · L0-L4 dispatcher · batches<br/>cure · settle · default · reserve"]
+      EX["BullStreetExchange<br/>escrowed limit orders"]
+    end
+    subgraph TOKENS["Assets"]
+      direction LR
+      AF["AssetFactory"]
+      TK["StockTokens<br/>bRELIANCE · bTCS · bINFY"]
+    end
+  end
+
+  %% ---------------- user ↔ app ----------------
+  MIN & BRK & TRD & OPS --> PAGES
+  PAGES --> IDK
+  PAGES -->|"reads every few seconds"| R_SNAP
+  PAGES -->|"plans, CDSL actions, feed"| R_DEP & R_PLAN & R_FEED
+  IDK -->|"proof"| R_WORLD
+  PAGES --> WAL
+
+  %% ---------------- wallet → contracts (user-signed) ----------------
+  WAL -->|"register(attestation)"| RR
+  WAL -->|"openPledge · mint · burn · cure<br/>requestRelease · migrate"| PR
+  WAL -->|"join · setDelegate · drain · exit"| BR
+  WAL -->|"deposit / withdraw bond"| BV
+  WAL -->|"trade · cancel"| EX
+  WAL -->|"requestRedemption · cure · claims"| RE
+  WAL -->|"owner: params, pauses,<br/>corporate actions"| PAR & CO & AF
+
+  %% ---------------- API ----------------
+  R_WORLD -->|"verify"| WORLD
+  R_WORLD -->|"signs RoleAttestation<br/>(World attestor key)"| KEYS
+  R_SNAP -->|"eth_call"| ARC
+  R_DEP & R_FEED & R_WORLD <--> DB
+
+  %% ---------------- workers ----------------
+  W_ORA --> PX & FX
+  W_ORA -->|"postSessions (2 of 3)"| SC
+  W_ORA -->|"postBatch closes (2 of 3)"| PO
+  W_IDX -->|"getLogs"| ARC
+  W_IDX --> DB
+  W_BRK <-->|"CDSL records,<br/>indexed allocations"| DB
+  W_BRK -->|"attestPledge · reattest<br/>confirmRelease (EIP-712)"| PR
+  W_BRK -->|"settle(SaleReport)"| RE
+  W_KEEP <-->|"CDSL auto-accept,<br/>15-day reject"| DB
+  W_KEEP -->|"processBatch · continueAllocation<br/>finalizeCure · claimReserve<br/>claimDefault"| RE
+  W_KEEP -->|"slashStale · rejectExpired"| PR
+  W_KEEP -->|"poke · sync · requeue"| BR & LB
+  W_KEEP -->|"reclaim expired"| EX
+  WORKERS -.-> KEYS
+
+  %% ---------------- contract ↔ contract ----------------
+  DIR -.-> CORE & LEDGER & MONEY & TOKENS
+  AF -->|"creates"| TK
+  TK -->|"check on every transfer"| CO
+  PR -->|"mint / burnFrom"| TK
+  PR -->|"add/sub exposure,<br/>mark draining/defaulted"| BR
+  PR -->|"payFromBond (slash, penalty)"| BV
+  PR -->|"addReserve"| RE
+  PR -->|"level changes"| LB
+  PR -->|"freshClose"| PO
+  RE -->|"onAllocate · onCure · onSettle<br/>onDefault · writeOff"| PR
+  RE -->|"payFromBond (default 105%)"| BV
+  RE -->|"statusOf · markDefaulted"| BR
+  RE -->|"burnFrom"| TK
+  RE -->|"refSession · deadlines"| SC
+  RE -->|"closeAt(refSession)"| PO
+  RE -->|"pick backing"| LB
+  BV -->|"onBondChanged"| BR
+  BR -->|"price exposure"| PO
+  EX -->|"paused?"| CO
+  EX -->|"expiry = next open"| SC
+  RR -.->|"role checks"| PR & BR
+```
+
+How to read it: solid arrows are calls or transactions, dotted arrows are lookups. Every arrow out of **Wallet** is signed by a user; every arrow out of **Workers** is signed by a service key from `.env`. If the workers stop, no new sessions or closes are posted, so minting, cures, settlements and payouts wait; trading and cancelling keep working.
+
 Detailed design: [docs/CONTEXT.md](docs/CONTEXT.md) (product and research), [docs/IMPLEMENTATION-PLAN.md](docs/IMPLEMENTATION-PLAN.md) (specification as built), [docs/architecture.md](docs/architecture.md) (diagrams), [docs/decisions.md](docs/decisions.md).
 
 ## Deployed on Arc testnet
