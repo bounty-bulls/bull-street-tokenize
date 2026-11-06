@@ -3,10 +3,11 @@
  * Index 0 is unused so the deployer key stays separate.
  */
 export const PERSONA_INDEX = {
-  oracleA: 1,
-  oracleB: 2,
-  oracleC: 3,
-  keeper: 4,
+  // service keys use indexes no other project key shares (the World attestor is a separate key)
+  oracleA: 21,
+  oracleB: 22,
+  oracleC: 23,
+  keeper: 24,
   brokerX: 5,
   brokerY: 6,
   brokerZ: 7,
