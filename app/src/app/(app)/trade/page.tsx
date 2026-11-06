@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { maxUint256, parseUnits, type Address } from "viem";
+import { formatUnits, maxUint256, parseUnits, type Address } from "viem";
 import { ORDER_STATUS_LABEL, OrderStatus, Side, exchangeAbi, mockUsdcAbi, stockTokenAbi } from "@bullstreet/shared";
 import { AssetTabs } from "@/components/AssetSelect";
 import {
@@ -151,7 +151,8 @@ function Ticket({ s, a, presetPrice, presetSide }: { s: Snapshot; a: AssetView; 
   const [done, setDone] = useState<string | null>(null);
 
   useEffect(() => {
-    if (presetPrice) setPriceIn((Number(presetPrice) / 1e6).toFixed(2));
+    // use the order's exact price: rounding to cents can land below an ask (or above a bid) and miss the fill
+    if (presetPrice) setPriceIn(formatUnits(presetPrice, 6));
   }, [presetPrice]);
   useEffect(() => {
     if (presetSide) setSide(presetSide);
