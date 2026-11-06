@@ -105,21 +105,32 @@ async function main() {
     await send(deployer, d.params, paramsAbi, "set", [paramKey("TIER_CAP_1"), cap1]);
   }
   let minBond = await param("MIN_BOND_1");
-  const needBond = (value * 115n) / 100n + 1_000_000n; // covers 110% (125% over long closures is checked only on new pledges)
+  // 135% keeps health above the 1.2 at-risk line (110% x 1.2 = 132%); SEED_BOND_PCT overrides
+  const bondPct = BigInt(process.env.SEED_BOND_PCT ?? (LOCAL ? 115 : 135));
+  const needBond = (value * bondPct) / 100n + 1_000_000n;
   if (!LOCAL && minBond > needBond) {
     // keep testnet bonds small: the tier minimum only needs to cover the seeded pledge
     minBond = needBond;
     await send(deployer, d.params, paramsAbi, "set", [paramKey("MIN_BOND_1"), minBond]);
   }
   const bond = (minBond > needBond ? minBond : needBond) + (LOCAL ? 0n : 1_000_000n);
-  const holderUsdc = LOCAL ? usd(50_000) : usd(Number(process.env.SEED_HOLDER_USDC ?? 20));
+  const holderUsdc = LOCAL ? usd(50_000) : usd(Number(process.env.SEED_HOLDER_USDC ?? 12));
   console.log(`   pledges of ${shares} shares, broker bonds of ${Number(bond) / 1e6} USDC`);
 
   // 1. money and gas
   console.log("1. funding wallets");
   for (const k of ["oracleA", "keeper", "agentX", "agentY", "agentZ"] as PersonaKey[]) await fund(P(k).address, LOCAL ? 0n : usd(2));
-  for (const b of BROKERS) await fund(P(b.key).address, bond + (LOCAL ? usd(50_000) : usd(Number(process.env.SEED_BROKER_EXTRA ?? 2))));
-  for (const m of MINTERS) await fund(P(m.key).address, LOCAL ? usd(10_000) : usd(Number(process.env.SEED_MINTER_USDC ?? 2)));
+  // seeded bids from Northgate: whole tokens locally, a fraction of a token on testnet (SEED_BID_TOKENS)
+  const bidAmount = LOCAL ? 10n ** 18n * BigInt(Math.max(1, Math.floor(shares / 10))) : BigInt(Math.round(Number(process.env.SEED_BID_TOKENS ?? 0.25) * 1e6)) * 10n ** 12n;
+  const bidEscrow = (3n * bidAmount * relClose) / 10n ** 18n + 1_000_000n;
+  for (const b of BROKERS) {
+    // a re-run counts the bond already deposited and the bids already posted
+    const deposited = await read<bigint>(d.bondVault, bondVaultAbi, "bondOf", [P(b.key).address]);
+    const bidsPosted = b.key === "brokerX" && (await read<bigint[]>(d.exchange, exchangeAbi, "ordersOf", [P(b.key).address])).length > 0;
+    const extra = LOCAL ? usd(50_000) : usd(Number(process.env.SEED_BROKER_EXTRA ?? 6)) + (b.key === "brokerX" && !bidsPosted ? bidEscrow : 0n);
+    await fund(P(b.key).address, (bond > deposited ? bond - deposited : 0n) + extra);
+  }
+  for (const m of MINTERS) await fund(P(m.key).address, LOCAL ? usd(10_000) : usd(Number(process.env.SEED_MINTER_USDC ?? 1.5)));
   await fund(P("bob").address, holderUsdc);
   for (const k of ["eve", "fay"] as PersonaKey[]) await fund(P(k).address, LOCAL ? usd(5_000) : usd(1));
 
@@ -166,7 +177,19 @@ async function main() {
     await approve(m.key, d.usdc, d.redemption);
     await approve(m.key, d.tokens[0], d.exchange);
     const existing = await read<bigint[]>(d.pledges, pledgeRegistryAbi, "pledgesOf", [acc.address]);
-    if (existing.length) continue;
+    const brokerBo = BROKERS.find((b) => b.key === m.broker)!.boId;
+    if (existing.length) {
+      // the pledge is on chain already; make sure the depository side exists too (for example after a fresh database)
+      const p = await read<any>(d.pledges, pledgeRegistryAbi, "pledgeOf", [existing[0]]);
+      if (Number(p.status) === 1 && !pledgeByAgreement(db, agreementFor(existing[0]))) {
+        setupPledge(
+          db,
+          { pledgorBoId: m.boId, pledgeeBoId: brokerBo, isin: rel.isin, qty: Number(p.q / 10n ** 18n), agreementNo: agreementFor(existing[0]), execDate: new Date().toISOString().slice(0, 10) },
+          { businessOpen: true, nextBusiness: now() },
+        );
+      }
+      continue;
+    }
     const broker = P(m.broker).address;
     const { result: pledgeId } = await publicClient.simulateContract({
       account: acc,
@@ -177,7 +200,6 @@ async function main() {
     });
     await send(acc, d.pledges, pledgeRegistryAbi, "openPledge", [rel.id, BigInt(shares), broker, false]);
     if (!pledgeByAgreement(db, agreementFor(pledgeId))) {
-      const brokerBo = BROKERS.find((b) => b.key === m.broker)!.boId;
       setupPledge(
         db,
         { pledgorBoId: m.boId, pledgeeBoId: brokerBo, isin: rel.isin, qty: shares, agreementNo: agreementFor(pledgeId), execDate: new Date().toISOString().slice(0, 10) },
@@ -207,22 +229,37 @@ async function main() {
 
   // 6. order book
   console.log("6. order book");
+  // seeded orders last ~23 hours (MAX_ORDER_TTL is a day) instead of expiring at the next open,
+  // so the book is not empty between sessions; short-lived ones from older runs are closed first
+  const expiry = BigInt(nowSec() + 23 * 3600);
+  const hasLiveOrders = async (who: PersonaKey) => {
+    let live = false;
+    for (const id of await read<bigint[]>(d.exchange, exchangeAbi, "ordersOf", [P(who).address])) {
+      const o = await read<any>(d.exchange, exchangeAbi, "getOrder", [id]);
+      if (Number(o.status) !== 1) continue;
+      if (Number(o.expiry) > nowSec() + 6 * 3600) live = true;
+      else if (Number(o.expiry) <= nowSec()) await send(P(who), d.exchange, exchangeAbi, "reclaim", [id]);
+      else await send(P(who), d.exchange, exchangeAbi, "cancel", [id]);
+    }
+    return live;
+  };
   const alice = P("alice");
-  const orders = await read<bigint[]>(d.exchange, exchangeAbi, "ordersOf", [alice.address]);
-  if (!orders.length) {
+  if (!(await hasLiveOrders("alice"))) {
     const balance = await read<bigint>(d.tokens[0], stockTokenAbi, "balanceOf", [alice.address]);
     const lot = balance / 4n;
     for (const bps of [50n, 100n, 200n]) {
       const price = (close * (10_000n + bps)) / 10_000n;
-      if (lot > 0n) await send(alice, d.exchange, exchangeAbi, "trade", [{ assetId: rel.id, side: Side.Sell, limitPrice: price, amount: lot, fillIds: [], rest: true, expiry: 0n, minFilled: 0n }]);
+      if (lot > 0n) await send(alice, d.exchange, exchangeAbi, "trade", [{ assetId: rel.id, side: Side.Sell, limitPrice: price, amount: lot, fillIds: [], rest: true, expiry, minFilled: 0n }]);
     }
-    const x = P("brokerX");
+    console.log("  3 asks from Alice");
+  }
+  const x = P("brokerX");
+  if (!(await hasLiveOrders("brokerX"))) {
     for (const bps of [50n, 100n, 200n]) {
       const price = (close * (10_000n - bps)) / 10_000n;
-      const amount = 10n ** 18n * BigInt(Math.max(1, Math.floor(shares / 10)));
-      await send(x, d.exchange, exchangeAbi, "trade", [{ assetId: rel.id, side: Side.Buy, limitPrice: price, amount, fillIds: [], rest: true, expiry: 0n, minFilled: 0n }]);
+      await send(x, d.exchange, exchangeAbi, "trade", [{ assetId: rel.id, side: Side.Buy, limitPrice: price, amount: bidAmount, fillIds: [], rest: true, expiry, minFilled: 0n }]);
     }
-    console.log("  3 asks from Alice, 3 bids from Northgate");
+    console.log("  3 bids from Northgate");
   }
 
   for (const k of ["bob", "eve", "fay"] as PersonaKey[]) {
