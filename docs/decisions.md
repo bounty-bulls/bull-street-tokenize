@@ -22,3 +22,13 @@ One row per decision: date · topic · decision · why.
 | 2026-11-06 | Reserve payouts | Reserve allocations are paid at the reference close too (claimable once it is posted), not instantly | Same reason as redemption pricing |
 | 2026-11-06 | Contract admin | `Ownable2Step` on each contract, plain deployments (no proxies) | Spec defaults A-P1-1, A-P1-2 |
 | 2026-11-06 | UI labels | No "mock", "demo" or "simulated" labels in the app; the README states what is simulated | Team decision |
+| 2026-11-06 | Contract size | Directory addresses are cached per contract (`Wired`), the engine has no owner, optimizer runs 50 | Keeps every contract under the 24 KB limit |
+| 2026-11-06 | Exchange rounding | Buy escrow rounds up, taker payouts round down, leftover escrow is refunded on close | The maker is never short |
+| 2026-11-06 | Dependencies | OpenZeppelin and forge-std installed from npm (no git submodules) | Builds anywhere `pnpm install` runs, including Arc Studio |
+| 2026-11-06 | API port | 8790 | 8787 is commonly taken |
+| 2026-11-06 | SQLite | better-sqlite3 12.x | 13.x crashes on Node 20 |
+| 2026-11-06 | Service keys | Oracle signers and keeper use mnemonic indexes 21-24; the World attestor is a separate key | No key holds two powers |
+| 2026-11-06 | Worker time | Workers use chain time (never behind wall time) | Deadlines are enforced on chain time |
+| 2026-11-06 | Health pokes | Only sent when health is below 1.0 or a cure clock is running | Saves gas on Arc |
+| 2026-11-06 | Depository auth | Pledgee actions (confirm, invoke, release) need a signed message from the pledgee wallet | Nobody can act on someone else's account |
+| 2026-11-06 | Arc scale | Deployed with `DEMO_SCALE=100`; caps are parameters and can be raised from Ops | Testnet USDC is limited |
