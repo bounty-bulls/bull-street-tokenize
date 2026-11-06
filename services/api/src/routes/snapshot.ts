@@ -37,8 +37,9 @@ const mc = async <T = any>(calls: Call[], chunk = 20): Promise<T[]> => {
 
 export async function buildSnapshot(wallet?: Address) {
   const d = deployment();
-  const now = Math.floor(Date.now() / 1000);
   const block = await publicClient.getBlock();
+  // deadlines run on block time, which can be ahead of this server's clock
+  const now = Math.max(Math.floor(Date.now() / 1000), Number(block.timestamp));
 
   // ---------------------------------------------------------------- calendar and params
   const [count, isOpen, ext, lastClosed, paramsAll] = await mc([

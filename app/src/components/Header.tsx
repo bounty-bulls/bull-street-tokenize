@@ -9,7 +9,7 @@ import { Bell, Check, ChevronDown, Copy, ExternalLink, Fingerprint, LogOut, Wall
 import { ROLE_LABEL } from "@bullstreet/shared";
 import { EXPLORER, IS_LOCAL, PASSKEY_ENABLED, chain } from "@/lib/config";
 import { api } from "@/lib/api";
-import { short, until, useNow, useSnapshot } from "@/lib/hooks";
+import { sessionAt, short, until, useNow, useSnapshot } from "@/lib/hooks";
 import { useActiveAccount, useDisconnectAll, usePasskey, usePersonas } from "@/lib/wallet";
 import { Wordmark } from "./Brand";
 import { StatusPill, usd } from "./ui";
@@ -26,7 +26,8 @@ export function MarketStatus() {
   const { data: s } = useSnapshot();
   const now = useNow();
   if (!s) return <StatusPill>NSE</StatusPill>;
-  const { current, next, extendedClosure } = s.calendar;
+  const { extendedClosure } = s.calendar;
+  const { current, next } = sessionAt(s.calendar, now);
   if (current) {
     return (
       <StatusPill tone="up" title="Trading session in progress">

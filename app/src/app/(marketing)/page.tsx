@@ -5,7 +5,7 @@ import { ArrowRight, ArrowUpRight } from "lucide-react";
 import { Wordmark } from "@/components/Brand";
 import { AssetName, BackingMeter, Skeleton, ticker, usd } from "@/components/ui";
 import { chain } from "@/lib/config";
-import { until, useNow, useSnapshot } from "@/lib/hooks";
+import { sessionAt, until, useNow, useSnapshot } from "@/lib/hooks";
 import { marketPrice, pledgedUnits, premiumPct, sumBig } from "@/lib/market";
 import type { Session } from "@/lib/types";
 
@@ -22,7 +22,7 @@ function SessionStrip() {
   const span = Math.max(end - start, 1);
   const pos = (t: number) => Math.min(100, Math.max(0, ((t - start) / span) * 100));
   const openTime = sessions.reduce((a, x) => a + (x.close - x.open), 0);
-  const { current, next } = s.calendar;
+  const { current, next } = sessionAt(s.calendar, now);
   return (
     <figure className="rounded-2xl border border-dark-line bg-dark-2 p-5 sm:p-6">
       <div className="flex flex-wrap items-baseline justify-between gap-2">

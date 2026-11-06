@@ -167,6 +167,13 @@ export function ago(ts: number, now: number): string {
   return `${Math.round(s / 86400)}d ago`;
 }
 
+/** The session in progress and the next one, worked out from the calendar at `now` (the snapshot may be a few seconds old). */
+export function sessionAt(cal: Snapshot["calendar"], now: number) {
+  const list = cal.sessions ?? [];
+  if (!list.length) return { current: cal.current, next: cal.next };
+  return { current: list.find((x) => x.open <= now && now < x.close), next: list.find((x) => x.open > now) };
+}
+
 export function until(ts: number, now: number): string {
   const s = ts - now;
   if (s <= 0) return "passed";
