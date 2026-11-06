@@ -1,4 +1,4 @@
-import { formatUnits, parseUnits } from "viem";
+import { formatUnits, parseUnits, stringToHex } from "viem";
 
 /** USDC has 6 decimals; tokens have 18. */
 export const USDC_DECIMALS = 6;
@@ -26,3 +26,6 @@ export const bps = (v: bigint | number) => `${(Number(v) / 100).toFixed(2)}%`;
 export function shortAddr(a?: string): string {
   return a ? `${a.slice(0, 6)}…${a.slice(-4)}` : "";
 }
+
+/** Params keys are bytes32 string literals in Solidity ("TIER_CAP_1" left-aligned, zero padded). */
+export const paramKey = (k: string) => stringToHex(k, { size: 32 });

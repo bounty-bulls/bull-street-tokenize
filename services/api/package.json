@@ -1,0 +1,27 @@
+{
+  "name": "@bullstreet/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@bullstreet/shared": "workspace:*",
+    "@hono/node-server": "2.1.6",
+    "@worldcoin/idkit-core": "4.6.0",
+    "hono": "4.13.16",
+    "viem": "2.57.13",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "7.6.13",
+    "@types/node": "26.6.6",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3",
+    "vitest": "5.0.5"
+  }
+}
