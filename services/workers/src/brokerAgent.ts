@@ -18,7 +18,7 @@ import {
 } from "@bullstreet/shared";
 import { agreementFor, getPledge, invoke, pledgeByAgreement, release, remainingOf } from "@bullstreet/shared/depository";
 import { kvGet, kvSet } from "@bullstreet/shared/db";
-import { CHAIN_ID, brokerAgents, d, db, errMsg, log, nowSec, read, send } from "./ctx";
+import { CHAIN_ID, brokerAgents, d, db, errMsg, log, nowSec, read, send , syncClock } from "./ctx";
 
 /**
  * A broker's automated desk (one per broker key pair). It does what the broker's back office would:
@@ -30,6 +30,7 @@ import { CHAIN_ID, brokerAgents, d, db, errMsg, log, nowSec, read, send } from "
  * The agent signs with the broker's delegate key; settlement money comes from the broker's main wallet.
  */
 export async function brokerTick(): Promise<void> {
+  await syncClock();
   for (const b of brokerAgents()) {
     try {
       await runBroker(b.main.address, b.agent, b.name);

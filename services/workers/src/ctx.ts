@@ -54,7 +54,17 @@ export async function send(account: Account, address: Address, abi: Abi | readon
 export const read = <T = any>(address: Address, abi: Abi | readonly unknown[], functionName: string, args: readonly unknown[] = []) =>
   publicClient.readContract({ address, abi: abi as Abi, functionName, args } as any) as Promise<T>;
 
-export const nowSec = () => Math.floor(Date.now() / 1000);
+/**
+ * Chain time: the latest block's timestamp plus wall-clock time elapsed since it was read. Deadlines are
+ * enforced by the contracts on chain time, so the workers use it too (it also follows time warps on anvil).
+ */
+let chainBase = { chain: Math.floor(Date.now() / 1000), wall: Date.now() };
+export async function syncClock(): Promise<void> {
+  const b = await publicClient.getBlock();
+  // an idle local chain lags wall time; a warped one runs ahead of it
+  chainBase = { chain: Math.max(Number(b.timestamp), Math.floor(Date.now() / 1000)), wall: Date.now() };
+}
+export const nowSec = () => chainBase.chain + Math.floor((Date.now() - chainBase.wall) / 1000);
 
 export function log(scope: string, msg: string, extra?: unknown) {
   const t = new Date().toISOString().slice(11, 19);

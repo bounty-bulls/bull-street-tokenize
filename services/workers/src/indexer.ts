@@ -41,7 +41,7 @@ const CHUNK = BigInt(process.env.INDEX_CHUNK ?? 5000);
 const ser = (v: unknown) => JSON.stringify(v, (_, x) => (typeof x === "bigint" ? x.toString() : x));
 
 export async function indexTick(): Promise<number> {
-  const head = await publicClient.getBlockNumber();
+  const head = await publicClient.getBlockNumber({ cacheTime: 0 });
   let from = BigInt(kvGet(db, "indexer.next") ?? d.deployBlock ?? 0);
   let total = 0;
   while (from <= head) {

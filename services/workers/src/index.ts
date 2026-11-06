@@ -1,5 +1,5 @@
 import { brokerTick } from "./brokerAgent";
-import { CHAIN_ID, d, errMsg, log } from "./ctx";
+import { CHAIN_ID, d, errMsg, log, syncClock } from "./ctx";
 import { indexTick } from "./indexer";
 import { keeperTick } from "./keeper";
 import { oracleTick } from "./oracle";
@@ -21,6 +21,7 @@ const jobs: { name: string; every: number; run: () => Promise<unknown> }[] = [
 async function loop(job: (typeof jobs)[number]) {
   for (;;) {
     try {
+      await syncClock();
       await job.run();
     } catch (e) {
       log(job.name, errMsg(e));

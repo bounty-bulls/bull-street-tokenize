@@ -17,7 +17,7 @@ import {
   sessionClockAbi,
 } from "@bullstreet/shared";
 import { processDue } from "@bullstreet/shared/depository";
-import { d, db, errMsg, keeperAccount, log, nowSec, read, send } from "./ctx";
+import { d, db, errMsg, keeperAccount, log, nowSec, read, send , syncClock } from "./ctx";
 
 /**
  * Permissionless upkeep. Anyone could run these; this keeper just makes sure nobody has to wait:
@@ -26,6 +26,7 @@ import { d, db, errMsg, keeperAccount, log, nowSec, read, send } from "./ctx";
  * returning expired orders.
  */
 export async function keeperTick(): Promise<void> {
+  await syncClock();
   const k = keeperAccount();
   const tryTx = async (label: string, address: Address, abi: any, fn: string, args: readonly unknown[]) => {
     try {

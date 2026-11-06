@@ -1,6 +1,6 @@
 import { ASSETS, domain, nextSessions, priceBatchTypes, priceOracleAbi, randomNonce, sessionBatchTypes, sessionClockAbi, type Session } from "@bullstreet/shared";
 import type { Hex } from "viem";
-import { CHAIN_ID, d, errMsg, log, nowSec, oracleSigners, read, send } from "./ctx";
+import { CHAIN_ID, d, errMsg, log, nowSec, oracleSigners, read, send, syncClock } from "./ctx";
 import { usdcPrices } from "./prices";
 
 const AHEAD = 24;
@@ -82,6 +82,7 @@ export async function postPrices(): Promise<void> {
 }
 
 export async function oracleTick(): Promise<void> {
+  await syncClock();
   try {
     await postSessions();
   } catch (e) {
