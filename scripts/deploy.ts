@@ -31,7 +31,7 @@ const vars: Record<string, string> = {
 if (target !== "local") vars.USDC_ADDRESS = process.env.USDC_ADDRESS ?? ARC_USDC;
 if (process.env.TREASURY) vars.TREASURY = process.env.TREASURY;
 
-const rpc = target === "local" ? "http://127.0.0.1:8545" : env("RPC_URL", "https://rpc.testnet.arc.network");
+const rpc = target === "local" ? "http://127.0.0.1:8545" : env("RPC_URL", "https://rpc.testnet.arc.network").split(",")[0].trim(); // forge takes one endpoint
 const args = ["script", "script/Deploy.s.sol", "--rpc-url", rpc, "--broadcast"];
 args.push("--slow"); // one transaction at a time: avoids dropped transactions on busy or automining nodes
 

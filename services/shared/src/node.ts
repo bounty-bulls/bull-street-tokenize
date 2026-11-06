@@ -2,7 +2,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { createPublicClient, createWalletClient, http, type Hex } from "viem";
+import { createPublicClient, createWalletClient, fallback, http, type Hex } from "viem";
 import { mnemonicToAccount, privateKeyToAccount, type HDAccount, type PrivateKeyAccount } from "viem/accounts";
 import { chainById } from "./chains";
 import type { Deployment } from "./deployment";
@@ -44,7 +44,13 @@ export function keyAccount(pk: string): PrivateKeyAccount {
 
 export function clients(chainId: number, rpcUrl: string) {
   const chain = chainById(chainId);
-  const transport = http(rpcUrl, { retryCount: 8, retryDelay: 800, timeout: 30_000 }); // the public Arc RPC rate-limits (429): back off and retry
+  // RPC_URL may list several endpoints separated by commas; the next one is used when one errors or
+  // rate-limits (429). Each endpoint backs off and retries on its own as well.
+  const urls = rpcUrl.split(",").map((u) => u.trim()).filter(Boolean);
+  const transport =
+    urls.length > 1
+      ? fallback(urls.map((u) => http(u, { retryCount: 1, timeout: 30_000 })), { retryCount: 6, retryDelay: 800 })
+      : http(urls[0], { retryCount: 8, retryDelay: 800, timeout: 30_000 });
   const publicClient = createPublicClient({ chain, transport });
   const wallet = (account: HDAccount | PrivateKeyAccount) => createWalletClient({ chain, transport, account });
   return { chain, publicClient, wallet };

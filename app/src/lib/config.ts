@@ -5,6 +5,8 @@ export const CHAIN_ID = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? 31337);
 export const IS_LOCAL = CHAIN_ID === 31337;
 export const chain = IS_LOCAL ? localChain : arcTestnet;
 export const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL ?? (IS_LOCAL ? "http://127.0.0.1:8545" : "https://rpc.testnet.arc.network");
+/** NEXT_PUBLIC_RPC_URL may list several endpoints separated by commas; the next is used when one fails. */
+export const RPC_URLS = RPC_URL.split(",").map((u) => u.trim()).filter(Boolean);
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8790";
 export const EXPLORER = IS_LOCAL ? undefined : "https://testnet.arcscan.app";
 

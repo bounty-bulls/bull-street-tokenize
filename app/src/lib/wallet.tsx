@@ -2,7 +2,7 @@
 
 import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { createPublicClient, http, type Abi, type Address, type Transport } from "viem";
+import { createPublicClient, fallback, http, type Abi, type Address, type Transport } from "viem";
 import { createBundlerClient, toWebAuthnAccount, type BundlerClient } from "viem/account-abstraction";
 import { WagmiProvider, createConfig, useAccount, useDisconnect } from "wagmi";
 import { injected, mock } from "wagmi/connectors";
@@ -14,7 +14,7 @@ import {
   toWebAuthnCredential,
   type WebAuthnCredential,
 } from "@circle-fin/modular-wallets-core";
-import { CIRCLE, IS_LOCAL, PASSKEY_ENABLED, RPC_URL, chain } from "./config";
+import { CIRCLE, IS_LOCAL, PASSKEY_ENABLED, RPC_URLS, chain } from "./config";
 import { api } from "./api";
 import type { Persona } from "./types";
 
@@ -129,7 +129,7 @@ function buildConfig(personas: Persona[]) {
   return createConfig({
     chains: [chain],
     connectors: [injected(), ...local],
-    transports: { [chain.id]: http(RPC_URL) } as Record<number, Transport>,
+    transports: { [chain.id]: RPC_URLS.length > 1 ? fallback(RPC_URLS.map((u) => http(u))) : http(RPC_URLS[0]) } as Record<number, Transport>,
     ssr: true,
   });
 }
