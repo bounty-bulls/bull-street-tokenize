@@ -5,6 +5,7 @@ import { CHAIN_ID, PORT, deployment } from "./ctx";
 import { activity } from "./routes/activity";
 import { dep } from "./routes/dep";
 import { notices } from "./routes/notices";
+import { personas } from "./routes/personas";
 import { plan } from "./routes/plan";
 import { snapshot } from "./routes/snapshot";
 import { world } from "./routes/world";
@@ -19,6 +20,7 @@ app.route("/dep", dep);
 app.route("/plan", plan);
 app.route("/notices", notices);
 app.route("/activity", activity);
+app.route("/personas", personas);
 app.onError((err, c) => {
   console.error(err);
   const msg = (err as any)?.shortMessage ?? err.message ?? "Server error";

@@ -83,6 +83,12 @@ async function register(who: PersonaKey, role: number) {
 
 async function main() {
   console.log(`Seeding chain ${CHAIN_ID}`);
+  if (LOCAL) {
+    // let the app's local account switcher send transactions as the seeded personas
+    for (const k of ["alice", "carol", "dev", "brokerX", "brokerY", "brokerZ", "bob", "eve", "fay"] as PersonaKey[]) {
+      await publicClient.request({ method: "anvil_impersonateAccount" as any, params: [P(k).address] as any });
+    }
+  }
   const param = async (k: string) => read<bigint>(d.params, paramsAbi, "get", [paramKey(k)]);
   const minBond = await param("MIN_BOND_1");
   const cap1 = await param("TIER_CAP_1");
