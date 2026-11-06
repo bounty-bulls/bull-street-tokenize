@@ -202,7 +202,11 @@ function Ticket({ s, a, presetPrice, presetSide }: { s: Snapshot; a: AssetView; 
   const short = side === "buy" ? needUsdc > balUsdc : amount > balTok;
   const instantShort = mode === "instant" && plan.filled < amount;
 
-  const expiryTs = expiry === "next" ? 0n : BigInt(now + (expiry === "day" ? 86400 : 7 * 86400));
+  // longer expiries are capped by MAX_ORDER_TTL (one day on the compressed calendar); keep a few minutes of
+  // margin because the browser clock can run ahead of the chain's
+  const maxTtl = Number(s.params.MAX_ORDER_TTL ?? 30 * 86400) - 300;
+  const ttlOf = (e: Expiry) => (e === "day" ? 86400 : 7 * 86400);
+  const expiryTs = expiry === "next" ? 0n : BigInt(now + Math.min(ttlOf(expiry), maxTtl));
 
   const submit = async () => {
     if (!d || !address) return;
@@ -280,8 +284,8 @@ function Ticket({ s, a, presetPrice, presetSide }: { s: Snapshot; a: AssetView; 
           <Field label="Order expires" hint="Default: before the next NSE open, so your price cannot be picked off after news breaks.">
             <select value={expiry} onChange={(e) => setExpiry(e.target.value as Expiry)}>
               <option value="next">At the next NSE open</option>
-              <option value="day">In 24 hours</option>
-              <option value="week">In 7 days</option>
+              <option value="day">{maxTtl < 86400 ? "In about 24 hours" : "In 24 hours"}</option>
+              {maxTtl >= 7 * 86400 && <option value="week">In 7 days</option>}
             </select>
           </Field>
         )}
