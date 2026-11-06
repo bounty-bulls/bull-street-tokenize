@@ -1,0 +1,7 @@
+packages:
+  - "contracts"
+  - "services/*"
+  - "app"
+onlyBuiltDependencies:
+  - better-sqlite3
+  - esbuild

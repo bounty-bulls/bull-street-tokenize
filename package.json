@@ -1,0 +1,19 @@
+{
+  "name": "bull-street",
+  "private": true,
+  "packageManager": "pnpm@10.34.5",
+  "scripts": {
+    "build:contracts": "cd contracts && forge build",
+    "test:contracts": "cd contracts && forge test",
+    "gen": "pnpm --filter @bullstreet/shared gen",
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "lint": "pnpm -r lint",
+    "e2e": "tsx scripts/e2e.ts"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.6",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3"
+  }
+}
