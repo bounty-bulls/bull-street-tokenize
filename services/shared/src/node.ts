@@ -44,7 +44,7 @@ export function keyAccount(pk: string): PrivateKeyAccount {
 
 export function clients(chainId: number, rpcUrl: string) {
   const chain = chainById(chainId);
-  const transport = http(rpcUrl, { retryCount: 3, timeout: 30_000 });
+  const transport = http(rpcUrl, { retryCount: 8, retryDelay: 800, timeout: 30_000 }); // the public Arc RPC rate-limits (429): back off and retry
   const publicClient = createPublicClient({ chain, transport });
   const wallet = (account: HDAccount | PrivateKeyAccount) => createWalletClient({ chain, transport, account });
   return { chain, publicClient, wallet };

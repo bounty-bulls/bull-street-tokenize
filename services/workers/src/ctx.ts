@@ -36,13 +36,26 @@ export function brokerAgents(): { name: string; main: Account; agent: Account }[
 const locks = new Map<string, Promise<unknown>>();
 
 /** Sends a transaction from `account`, one at a time per account, and waits for the receipt. */
+/** viem never retries eth_sendRawTransaction; a 429 means the node refused it, so sending again is safe */
+async function rateLimited<T>(fn: () => Promise<T>, tries = 8): Promise<T> {
+  for (let i = 0; ; i++) {
+    try {
+      return await fn();
+    } catch (e: any) {
+      const limited = /rate limit|exceeds defined limit|429/i.test(String(e?.details ?? e?.shortMessage ?? e?.message ?? ""));
+      if (!limited || i >= tries - 1) throw e;
+      await new Promise((r) => setTimeout(r, 1000 * 2 ** Math.min(i, 4)));
+    }
+  }
+}
+
 export async function send(account: Account, address: Address, abi: Abi | readonly unknown[], functionName: string, args: readonly unknown[] = []) {
   const key = account.address;
   const prev = locks.get(key) ?? Promise.resolve();
   const run = prev.catch(() => {}).then(async () => {
     const w = wallet(account);
     const { request } = await publicClient.simulateContract({ account, address, abi: abi as Abi, functionName, args } as any);
-    const hash: Hex = await w.writeContract(request as any);
+    const hash: Hex = await rateLimited(() => w.writeContract(request as any));
     const r = await publicClient.waitForTransactionReceipt({ hash, timeout: 120_000 });
     if (r.status !== "success") throw new Error(`${functionName} reverted (${hash})`);
     return r;
