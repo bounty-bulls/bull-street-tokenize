@@ -44,7 +44,10 @@ async function attest(wallet: Address, role: number, nullifierHash: Hex) {
   if (Number(current) !== 0) return { error: "WALLET_HAS_ROLE" as const };
 
   const signer = worldAttestor();
-  const attestation = { wallet, role, nullifierHash, expiry: BigInt(now() + 15 * 60), nonce: randomNonce() };
+  // expiry is checked against block time, which can run ahead of the server clock (e.g. a fast-forwarded test chain)
+  const block = await publicClient.getBlock();
+  const base = Math.max(now(), Number(block.timestamp));
+  const attestation = { wallet, role, nullifierHash, expiry: BigInt(base + 15 * 60), nonce: randomNonce() };
   const signature = await signer.signTypedData({
     domain: domain(CHAIN_ID, d.roles),
     types: roleAttestationTypes,
