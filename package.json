@@ -9,7 +9,14 @@
     "build": "pnpm -r build",
     "test": "pnpm -r test",
     "lint": "pnpm -r lint",
-    "e2e": "tsx scripts/e2e.ts"
+    "e2e": "tsx scripts/e2e.ts",
+    "chain": "anvil --port 8545 --block-time 1",
+    "deploy:local": "tsx scripts/deploy.ts local",
+    "deploy:arc": "tsx scripts/deploy.ts arc",
+    "seed": "tsx scripts/seed.ts",
+    "api": "pnpm --filter @bullstreet/api start",
+    "workers": "pnpm --filter @bullstreet/workers start",
+    "dev": "pnpm --filter @bullstreet/app dev"
   },
   "devDependencies": {
     "@types/node": "26.6.6",
