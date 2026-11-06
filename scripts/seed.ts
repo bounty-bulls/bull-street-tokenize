@@ -91,18 +91,37 @@ async function main() {
     }
   }
   const param = async (k: string) => read<bigint>(d.params, paramsAbi, "get", [paramKey(k)]);
-  const minBond = await param("MIN_BOND_1");
-  const cap1 = await param("TIER_CAP_1");
-  const bond = (minBond * 13n) / 10n;
-  const holderUsdc = LOCAL ? usd(50_000) : usd(Number(process.env.SEED_HOLDER_USDC ?? 40));
+  // the oracle needs gas before it can post the calendar and the closes the sizing uses
+  for (const k of ["oracleA", "keeper"] as PersonaKey[]) await fund(P(k).address, LOCAL ? 0n : usd(2));
+  // pledge size: SEED_PLEDGE_SHARES, or 70% of the tier-1 cap on a local chain
+  await postSessions();
+  await postPrices();
+  const [relClose] = await read<[bigint, number, bigint]>(d.priceOracle, priceOracleAbi, "closeOf", [ASSETS[0].id]);
+  let cap1 = await param("TIER_CAP_1");
+  const shares = Number(process.env.SEED_PLEDGE_SHARES ?? Math.max(1, Number(((cap1 * 7n) / 10n) / relClose)));
+  const value = BigInt(shares) * relClose;
+  if (value > cap1) {
+    cap1 = (value * 12n) / 10n;
+    await send(deployer, d.params, paramsAbi, "set", [paramKey("TIER_CAP_1"), cap1]);
+  }
+  let minBond = await param("MIN_BOND_1");
+  const needBond = (value * 115n) / 100n + 1_000_000n; // covers 110% (125% over long closures is checked only on new pledges)
+  if (!LOCAL && minBond > needBond) {
+    // keep testnet bonds small: the tier minimum only needs to cover the seeded pledge
+    minBond = needBond;
+    await send(deployer, d.params, paramsAbi, "set", [paramKey("MIN_BOND_1"), minBond]);
+  }
+  const bond = (minBond > needBond ? minBond : needBond) + (LOCAL ? 0n : 1_000_000n);
+  const holderUsdc = LOCAL ? usd(50_000) : usd(Number(process.env.SEED_HOLDER_USDC ?? 20));
+  console.log(`   pledges of ${shares} shares, broker bonds of ${Number(bond) / 1e6} USDC`);
 
   // 1. money and gas
   console.log("1. funding wallets");
   for (const k of ["oracleA", "keeper", "agentX", "agentY", "agentZ"] as PersonaKey[]) await fund(P(k).address, LOCAL ? 0n : usd(2));
-  for (const b of BROKERS) await fund(P(b.key).address, bond + (LOCAL ? usd(50_000) : usd(Number(process.env.SEED_BROKER_EXTRA ?? 20))));
-  for (const m of MINTERS) await fund(P(m.key).address, LOCAL ? usd(10_000) : usd(Number(process.env.SEED_MINTER_USDC ?? 10)));
+  for (const b of BROKERS) await fund(P(b.key).address, bond + (LOCAL ? usd(50_000) : usd(Number(process.env.SEED_BROKER_EXTRA ?? 2))));
+  for (const m of MINTERS) await fund(P(m.key).address, LOCAL ? usd(10_000) : usd(Number(process.env.SEED_MINTER_USDC ?? 2)));
   await fund(P("bob").address, holderUsdc);
-  for (const k of ["eve", "fay"] as PersonaKey[]) await fund(P(k).address, LOCAL ? usd(5_000) : usd(5));
+  for (const k of ["eve", "fay"] as PersonaKey[]) await fund(P(k).address, LOCAL ? usd(5_000) : usd(1));
 
   // 2. calendar and prices
   console.log("2. sessions and prices");
@@ -139,9 +158,7 @@ async function main() {
   // 5. minters: demat accounts, pledges, mints
   console.log("5. minters");
   const rel = ASSETS[0];
-  const [close] = await read<[bigint, number, bigint]>(d.priceOracle, priceOracleAbi, "closeOf", [rel.id]);
-  const shares = Number(((cap1 * 7n) / 10n) / close);
-  if (shares < 1) throw new Error("Tier 1 cap is below one share; lower DEMO_SCALE");
+  const close = relClose;
   for (const m of MINTERS) {
     const acc = P(m.key);
     createAccount(db, { boId: m.boId, ownerWallet: acc.address, name: m.name, holdings: { [rel.isin]: shares * 4, [ASSETS[1].isin]: 50, [ASSETS[2].isin]: 200 } });
@@ -202,7 +219,7 @@ async function main() {
     const x = P("brokerX");
     for (const bps of [50n, 100n, 200n]) {
       const price = (close * (10_000n - bps)) / 10_000n;
-      const amount = (10n ** 18n * BigInt(Math.max(1, Math.floor(shares / 10)))) as bigint;
+      const amount = 10n ** 18n * BigInt(Math.max(1, Math.floor(shares / 10)));
       await send(x, d.exchange, exchangeAbi, "trade", [{ assetId: rel.id, side: Side.Buy, limitPrice: price, amount, fillIds: [], rest: true, expiry: 0n, minFilled: 0n }]);
     }
     console.log("  3 asks from Alice, 3 bids from Northgate");
