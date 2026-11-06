@@ -7,7 +7,7 @@ loadEnv();
 /** Server configuration. Private keys stay in this process; the browser never sees them. */
 export const CHAIN_ID = Number(process.env.CHAIN_ID ?? 31337);
 export const RPC_URL = process.env.RPC_URL ?? "http://127.0.0.1:8545";
-export const PORT = Number(process.env.API_PORT ?? 8787);
+export const PORT = Number(process.env.API_PORT ?? 8790);
 export const WORLD = {
   rpId: process.env.WORLD_RP_ID ?? process.env.NEXT_PUBLIC_WORLD_RP_ID ?? "",
   appId: process.env.NEXT_PUBLIC_WORLD_APP_ID ?? "",
