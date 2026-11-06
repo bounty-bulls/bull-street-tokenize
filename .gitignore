@@ -1,0 +1,28 @@
+# env and secrets
+.env
+.env.*
+!.env.example
+
+# deps and builds
+node_modules/
+.next/
+out/
+dist/
+*.tsbuildinfo
+next-env.d.ts
+
+# foundry
+contracts/out/
+contracts/cache/
+contracts/broadcast/*/31337/
+contracts/broadcast/*/*/dry-run/
+
+# local data
+data/
+*.sqlite
+*.sqlite-journal
+deploy/local/
+
+# misc
+*.log
+.DS_Store
