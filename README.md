@@ -73,7 +73,7 @@ Even after Nasdaq and NYSE Arca move to 23 hours a day on weekdays (from 6 Dec 2
 |---|---|---|
 | Peak price | $61.15 (+112%) | $28.98 (+0.5%) |
 | Tokens bought with $172k | 4,104 (avg $41.99) | 5,946 (avg $28.98), **45% more** |
-| Buyers' overpayment | $54k (+46%) | about $0.8k |
+| Buyers' overpayment | $54k (+46%) | about $0.9k |
 | Who earns the premium | one issuer | the shareholders who mint, in competition |
 
 **Why payouts use the next close.** If redemptions were priced at Friday's close, redeeming after bad-news weekends would hand arbitrageurs up to 11.5% of the float a year (Nifty 50; 10–18% for large caps). Bull Street prices every payout at the first close after the request, which removes that leak.
