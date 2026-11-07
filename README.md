@@ -45,7 +45,9 @@ Reproducible from [`research/`](research) (10 years of daily prices from Yahoo F
 
 | NSE | Tokyo | Hong Kong | New York | London |
 |---|---|---|---|---|
-| 81% | 85% | 84% | 81% | 75% |
+| 81% | 84% | 84% | 81% | 75% |
+
+Even after Nasdaq and NYSE Arca move to 23 hours a day on weekdays (from 6 Dec 2026), US stocks stay shut 49 hours every weekend ([Skadden](https://www.skadden.com/insights/publications/2026/10/nyse-arca-and-nasdaq-to-launch-extended-trading)).
 
 **Prices keep moving while they sleep.**
 - **39%** of the Nifty 50's price variance happens while NSE is closed (overnight, weekend and holiday gaps). For large caps it is 24–38%.
@@ -54,10 +56,16 @@ Reproducible from [`research/`](research) (10 years of daily prices from Yahoo F
   - Nifty 50: −9.1% (23 Mar 2020) and −5.0% (7 Apr 2025).
   - RELIANCE: −10.0% (23 Mar 2020) and +5.4% (2 Nov 2026).
 
+**The demand is already there.**
+- Tokenized stocks hold $3.69B across 4.75M holders ([rwa.xyz](https://app.rwa.xyz/stocks), 6 Nov 2026), up from $639M a year earlier ([RedStone](https://redstone.finance/research/tokenized-stocks-2026)).
+- In October 2026, **65%** of tokenized-stock DEX trading happened outside US market hours and 18% on weekends (Bitquery, via [Crypto Briefing](https://cryptobriefing.com/jupiter-tokenized-stocks-off-hours-trading/)).
+- Most issuers still mint only while the underlying market is open. Ondo is the exception: it has minted 24/7 since June 2026, but only for six US tickers.
+- India, by contrast: a ₹474 trillion (about $5T) market (NSE, June 2026) with 238M demat accounts (SEBI, August 2026), where foreign ownership is at a 17-year low of 15.1% ([NSE ownership tracker](https://nsearchives.nseindia.com//web/mediaattachment/2026-08/India_Ownership_Report_June_2026_20260818113541.pdf)).
+
 **Frozen supply makes token prices break.** HIMS, 30–31 Aug 2026:
 - The stock itself didn't move: Friday close $28.84, Monday open $28.67 (Yahoo Finance).
 - Its token hit **$61.15 (+112%)** on Sunday because the issuer's mint window was shut ([DeFi Prime](https://defiprime.com/tokenized-stock-float-squeeze), [The Defiant](https://thedefiant.io/news/tokens/a-memecoin-called-boner-has-cornered-half-the-tokenized-hims-and-hers-float)).
-- When minting reopened, the issuer minted 18,750 tokens in 294 mints while the premium fell from 93% to 12%. Our estimate of what that premium was worth to the single issuer: **about $170k–$285k in twelve minutes**.
+- When minting reopened, the issuer's single authorised participant minted 18,750 tokens in 294 mints, and the premium fell from 93% to 12% within twelve minutes (00:43–00:55 UTC). No profit figure has been published. Our estimate of what the premium was worth to that one minter: **about $170k–$285k**.
 
 **Simulation: the same squeeze with Bull Street** (`research/squeeze.py`). It uses a constant-product pool of the reported 13,100 tokens at $28.84 and the same $172k of weekend buying:
 
