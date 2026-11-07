@@ -1,6 +1,6 @@
 # Bull Street
 
-**Pledge-backed tokens for Indian equities, traded peer to peer, settled in USDC on Arc.**
+**Pledge-backed stock tokens, traded peer to peer around the clock, settled in USDC on Arc. Starting with Indian equities (NSE); built for every market that closes.**
 
 Shareholders pledge shares they already own to a bonded broker through CDSL, mint one token per pledged share at any hour, and sell them on Bull Street's peer-to-peer order book. Any holder can redeem for USDC: the broker sells the pledged shares on NSE, the owner pays to keep them, or the broker's USDC bond pays 105%. Every payout is priced at the first NSE close after the request, so nobody can redeem at a stale price after news breaks while the market is closed.
 
@@ -14,16 +14,18 @@ Shareholders pledge shares they already own to a bonded broker through CDSL, min
 
 ## Contents
 1. [The problem](#the-problem)
-2. [How it works](#how-it-works)
-3. [Why USDC settlement](#why-usdc-settlement)
-4. [World ID: the trust moment](#world-id-the-trust-moment)
-5. [Architecture](#architecture)
-6. [Deployed on Arc testnet](#deployed-on-arc-testnet)
-7. [Run it](#run-it)
-8. [What is real and what is simulated](#what-is-real-and-what-is-simulated)
-9. [Limitations and open risks](#limitations-and-open-risks)
-10. [Roadmap](#roadmap)
-11. [Repository layout](#repository-layout)
+2. [The numbers](#the-numbers)
+3. [How it works](#how-it-works)
+4. [Why USDC settlement](#why-usdc-settlement)
+5. [World ID: the trust moment](#world-id-the-trust-moment)
+6. [Architecture](#architecture)
+7. [Deployed on Arc testnet](#deployed-on-arc-testnet)
+8. [Run it](#run-it)
+9. [What is real and what is simulated](#what-is-real-and-what-is-simulated)
+10. [Limitations and open risks](#limitations-and-open-risks)
+11. [Roadmap](#roadmap)
+12. [Repository layout](#repository-layout)
+13. [Arc Studio and hackathon submission](#arc-studio-and-hackathon-submission)
 
 ---
 
@@ -34,6 +36,39 @@ Tokenized stocks today follow the issuer model: an authorised participant buys t
 For Indian equities the gap is larger: NSE trades 09:15-15:30 IST on weekdays, about 19% of the week, and buying Indian shares from abroad is hard.
 
 **Our insight:** if the shares are already locked before minting, minting needs no open market. India's depository pledge does exactly that: shares stay in the owner's demat account, pledged to a pledgee who can invoke them (in part) without the owner's action ([CDSL DP Operating Instructions, ch. 8](https://www.cdslindia.com/downloads/DP/currentDPs/DP-Operating-Instructions-Chapter-as-on-March-31-2025.pdf)).
+
+## The numbers
+
+Reproducible from [`research/`](research) (10 years of daily prices from Yahoo Finance, 7 Nov 2016 – 5 Nov 2026).
+
+**Markets sleep most of the week.** The share of each week a market is closed, from regular hours × 5 days ÷ 168 h:
+
+| NSE | Tokyo | Hong Kong | New York | London |
+|---|---|---|---|---|
+| 81% | 85% | 84% | 81% | 75% |
+
+**Prices keep moving while they sleep.**
+- **39%** of the Nifty 50's price variance happens while NSE is closed (overnight, weekend and holiday gaps). For large caps it is 24–38%.
+- **One weekend in five**, large caps (RELIANCE, INFY, HDFC Bank, ICICI Bank) open more than 1% away from Friday's close. The Nifty does so on one weekend in nine.
+- Worst weekends:
+  - Nifty 50: −9.1% (23 Mar 2020) and −5.0% (7 Apr 2025).
+  - RELIANCE: −10.0% (23 Mar 2020) and +5.4% (2 Nov 2026).
+
+**Frozen supply makes token prices break.** HIMS, 30–31 Aug 2026:
+- The stock itself didn't move: Friday close $28.84, Monday open $28.67 (Yahoo Finance).
+- Its token hit **$61.15 (+112%)** on Sunday because the issuer's mint window was shut ([DeFi Prime](https://defiprime.com/tokenized-stock-float-squeeze), [The Defiant](https://thedefiant.io/news/tokens/a-memecoin-called-boner-has-cornered-half-the-tokenized-hims-and-hers-float)).
+- When minting reopened, the issuer minted 18,750 tokens in 294 mints while the premium fell from 93% to 12%. Our estimate of what that premium was worth to the single issuer: **about $170k–$285k in twelve minutes**.
+
+**Simulation: the same squeeze with Bull Street** (`research/squeeze.py`). It uses a constant-product pool of the reported 13,100 tokens at $28.84 and the same $172k of weekend buying:
+
+| | Issuer model (supply frozen) | Bull Street (any pledged shareholder can mint) |
+|---|---|---|
+| Peak price | $61.15 (+112%) | $28.98 (+0.5%) |
+| Tokens bought with $172k | 4,104 (avg $41.99) | 5,946 (avg $28.98), **45% more** |
+| Buyers' overpayment | $54k (+46%) | about $0.8k |
+| Who earns the premium | one issuer | the shareholders who mint, in competition |
+
+**Why payouts use the next close.** If redemptions were priced at Friday's close, redeeming after bad-news weekends would hand arbitrageurs up to 11.5% of the float a year (Nifty 50; 10–18% for large caps). Bull Street prices every payout at the first close after the request, which removes that leak.
 
 ## How it works
 
@@ -203,3 +238,36 @@ docs/           CONTEXT.md, IMPLEMENTATION-PLAN.md, architecture.md, decisions.m
 ```
 
 License: MIT.
+
+## Arc Studio and hackathon submission
+
+ETHGlobal Mumbai, Arc prize **"Best DeFi / Onchain Finance App Built End to End in Arc Studio"** ($3,000).
+
+- [Prize page](https://ethglobal.com/events/mumbai/prizes)
+- [Rules and deadline](https://ethglobal.com/events/mumbai/info/details): submissions close **Sat 7 Nov 2026, 09:00 IST**; late entries are not accepted.
+
+**Arc Studio**
+- App: https://studio.arc.io
+- Docs: https://docs.arc.io/ai/arc-studio.md (CLI: https://docs.arc.io/ai/arc-studio-cli.md; limits: https://docs.arc.io/ai/arc-studio-troubleshooting.md)
+- Arc chain differences: https://docs.arc.io/arc/references/evm-differences.md
+- Faucet: https://faucet.circle.com
+
+**What the track asks for** (from the prize page):
+1. Built in Arc Studio. Include a shareable Arc Studio project URL judges can open, and show Studio in the demo.
+2. A functional MVP: a working frontend and backend, plus an architecture diagram ([docs/architecture.md](docs/architecture.md)).
+3. A video demonstration and presentation: core functions and the use of Arc Studio and Circle's developer tools. ETHGlobal encourages 2–4 minutes.
+4. A link to the GitHub repo.
+5. State clearly which bounty you are entering.
+
+ETHGlobal also requires incremental version control and asks teams to document how they used AI tools.
+
+**Bringing this repo into Arc Studio:** follow [docs/arc-studio/PROMPTS.md](docs/arc-studio/PROMPTS.md). Its prompts point Arc Studio's agent at [docs/arc-studio/GUIDE.md](docs/arc-studio/GUIDE.md), which tells it to run the project exactly as built:
+- install and run the 54 contract tests;
+- start the Next.js app in the live preview against the live Arc deployment;
+- connect to the live API through an HTTPS tunnel, because the Studio sandbox can only reach allowlisted hosts.
+
+| Item | Value |
+|---|---|
+| Arc Studio project URL | _add after import_ |
+| Demo video | _add link_ |
+| Bounty entered | Arc: Best DeFi / Onchain Finance App Built End to End in Arc Studio; World: Best use of IDKit |
